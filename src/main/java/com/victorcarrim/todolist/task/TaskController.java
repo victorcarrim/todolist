@@ -1,11 +1,13 @@
 package com.victorcarrim.todolist.task;
 
 import com.victorcarrim.todolist.user.IUserRepository;
+import com.victorcarrim.todolist.utils.Utils;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -36,18 +38,22 @@ public class TaskController {
         return ResponseEntity.status(HttpStatus.CREATED).body("");
     }
 
-    @GetMapping("/getTaskById")
-    public List<TaskModel> list(HttpServletRequest request){
+    @GetMapping("/getTaskByIdUser")
+    public ResponseEntity<List<TaskModel>> list(HttpServletRequest request){
         var idUser = request.getAttribute("idUser");
-        System.out.println(idUser);
         var list = this.taskRepository.findByIdUser((UUID) idUser);
-        return list;
+        return ResponseEntity.status(HttpStatus.ACCEPTED).body(list);
     }
 
     @PutMapping("/{idTask}")
-    public TaskModel update(@RequestBody TaskModel taskModel, HttpServletRequest request, @PathVariable UUID idTask){
-        taskModel.setId(idTask);
-        this.taskRepository.saveAndFlush(taskModel);
-        return taskModel;
+    public ResponseEntity update(@RequestBody TaskModel taskModel, HttpServletRequest request, @PathVariable UUID idTask){
+        var idUser = request.getAttribute("idUser");
+        var task =  this.taskRepository.findById(idTask).orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Task não encontrada"));
+        if(!task.getIdUser().equals(idUser)){
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Este usuário não tem permissão para alterar essa task");
+        }
+        Utils.copyNonNullProperties(taskModel, task);
+        this.taskRepository.saveAndFlush(task);
+        return ResponseEntity.status(HttpStatus.ACCEPTED).body(task);
     }
 }
